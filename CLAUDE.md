@@ -131,3 +131,5 @@ Currently in planning/setup phase. The directory structure exists but implementa
 - Maintain compatibility with Go 1.24+
 - Follow Go best practices and naming conventions
 - Document learning insights in `docs/learning-notes.md`
+- 生成关键代码的时候要先写测试用例
+- 没有必要生成预期失败的测试用例
