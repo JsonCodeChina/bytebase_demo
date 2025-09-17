@@ -1,141 +1,253 @@
 # SQL Review Learning Demo
 
-基于 Bytebase SQL 审查模块的学习演示项目
+[![Go Version](https://img.shields.io/badge/Go-1.24+-blue.svg)](https://golang.org/)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+[![GitHub Issues](https://img.shields.io/github/issues/JsonCodeChina/bytebase_demo.svg)](https://github.com/JsonCodeChina/bytebase_demo/issues)
 
-## 🎯 项目目标
+> 🎯 **学习目标**: 基于 Bytebase 架构的企业级 SQL 审查系统学习演示项目
 
-通过构建一个简化但功能完整的 SQL 审查系统，深度理解 Bytebase 的核心设计思路和实现机制。
+通过构建一个简化但功能完整的 SQL 审查系统，深度理解企业级规则引擎的设计思路和实现机制。
 
-## 📚 学习资源
+## ✨ 项目亮点
 
-### 参考项目
-- **Bytebase**: `/Users/shenbo/goprojects/bytebase-3.5.2/`
-  - 原始项目，用于学习架构设计和最佳实践
-  - 重点参考目录：
-    - `backend/plugin/advisor/` - SQL审查引擎
-    - `backend/api/v1/` - API服务层
-    - `backend/store/` - 数据存储层
+- 🏗️ **插件化架构**: 基于 Bytebase 设计的规则系统
+- 🔌 **多数据库支持**: MySQL、PostgreSQL 连接管理
+- 🌐 **RESTful API**: 完整的 HTTP 服务接口
+- ⚙️ **企业级配置**: 多环境配置管理系统
+- 📊 **Schema 分析**: 数据库结构读取和分析
+- 🔍 **实时审查**: SQL 语句实时审查功能
 
-### 分析报告
-- **深度分析报告**: `docs/bytebase-sql-review-analysis.md`
-  - Bytebase SQL审查模块的完整架构分析
-  - 核心技术和设计模式解读
-  - 改进建议和学习价值总结
+## 🚀 快速开始
 
-## 🏗️ 项目结构
+### 前置要求
+
+- Go 1.24 或更高版本
+- MySQL/PostgreSQL 数据库（可选，用于测试）
+
+### 安装运行
+
+```bash
+# 克隆项目
+git clone https://github.com/JsonCodeChina/bytebase_demo.git
+cd bytebase_demo
+
+# 安装依赖
+make deps
+
+# 构建项目
+make build-all
+
+# 启动 API 服务器
+make run-server
+```
+
+服务器将在 `http://localhost:8080` 启动
+
+### 测试 API
+
+```bash
+# 健康检查
+curl http://localhost:8080/health
+
+# 查看可用规则
+curl http://localhost:8080/api/rules
+
+# 测试 SQL 审查
+curl -X POST http://localhost:8080/api/sql/review \
+  -H "Content-Type: application/json" \
+  -d '{
+    "sql": "CREATE TABLE users (name VARCHAR(50))",
+    "connection_id": "demo",
+    "rules": ["mysql.table.require-pk"]
+  }'
+```
+
+## 📁 项目结构
 
 ```
 sql-review-learning-demo/
-├── README.md                    # 项目说明
-├── docs/                        # 文档目录
-│   ├── bytebase-sql-review-analysis.md  # Bytebase分析报告
-│   ├── project-plan.md          # 项目实施计划
-│   └── learning-notes.md        # 学习笔记
-├── cmd/                         # 主程序入口
-│   └── demo/
-│       └── main.go
-├── pkg/                         # 核心包
-│   ├── advisor/                 # 审查规则引擎
-│   │   ├── advisor.go           # 核心接口定义
-│   │   ├── registry.go          # 规则注册器
-│   │   └── context.go           # 审查上下文
-│   ├── parser/                  # SQL解析器封装
-│   │   ├── mysql/
-│   │   └── common.go
-│   ├── rules/                   # 具体规则实现
-│   │   ├── mysql/
-│   │   │   ├── table_require_pk.go
-│   │   │   ├── naming_convention.go
-│   │   │   └── ...
-│   │   └── common/
-│   └── config/                  # 配置管理
-│       ├── config.go
-│       └── rule_config.go
-├── examples/                    # 测试SQL样例
-│   ├── good_examples.sql
-│   ├── bad_examples.sql
-│   └── mixed_examples.sql
-├── testdata/                   # 测试数据
-├── go.mod
-├── go.sum
-└── Makefile                    # 构建脚本
+├── cmd/
+│   └── server/              # HTTP API 服务器
+├── pkg/
+│   ├── advisor/             # SQL 审查核心引擎
+│   ├── api/                 # HTTP API 处理器
+│   ├── config/              # 配置管理系统
+│   ├── database/            # 数据库连接管理
+│   └── rules/               # SQL 审查规则实现
+│       └── mysql/           # MySQL 特定规则
+├── config/                  # 配置文件
+│   ├── app.yaml            # 主配置
+│   ├── rules.yaml          # 规则配置
+│   ├── development.yaml    # 开发环境配置
+│   └── production.yaml     # 生产环境配置
+├── examples/               # SQL 测试样例
+└── docs/                   # 项目文档
 ```
 
-## 🎨 核心功能设计
+## 🎨 核心架构
 
-### 1. 审查引擎核心
-- 实现简化版的 `Advisor` 接口
-- 支持规则的动态注册和执行
-- 提供分级的审查结果（ERROR/WARNING）
+### 插件化规则系统
 
-### 2. SQL解析器
-- 集成 ANTLR MySQL 语法解析器
-- 支持 AST 遍历和节点分析
-- 提供精确的错误位置定位
+```go
+// 审查器接口
+type Advisor interface {
+    Check(ctx context.Context, checkCtx *Context) ([]*Advice, error)
+}
 
-### 3. 规则实现
-计划实现以下典型规则：
-- **表结构规则**: 表必须有主键
-- **命名规范**: 表名和列名命名约定
-- **数据类型**: 禁止使用特定数据类型
-- **语句安全**: 检查危险SQL操作
-- **性能优化**: 索引使用建议
+// 规则接口
+type Rule interface {
+    ID() string
+    Check(ctx context.Context, checkCtx *Context) ([]*Advice, error)
+}
+```
 
-### 4. CLI工具
-- 支持单文件和目录批量检查
-- 可配置的规则开关和参数
-- 友好的结果展示和错误说明
+### 配置管理
 
-## 🚀 学习路径
+支持多层配置加载：**默认配置** → **文件配置** → **环境变量**
 
-### 阶段一：核心架构理解
-1. 研读 Bytebase 源码中的关键接口
-2. 理解插件化架构的设计思路
-3. 分析规则注册和执行机制
+```bash
+# 开发环境
+APP_ENV=development make run-server
 
-### 阶段二：解析器集成
-1. 学习 ANTLR 语法文件和生成器
-2. 实现 SQL 语法树的遍历和分析
-3. 封装解析器接口，支持扩展
+# 生产环境
+APP_ENV=production make run-server
 
-### 阶段三：规则开发
-1. 实现基础的表结构检查规则
-2. 添加命名约定和最佳实践规则
-3. 开发性能相关的审查规则
+# 自定义端口
+SERVER_PORT=9000 make run-server
+```
 
-### 阶段四：工具完善
-1. 开发命令行工具界面
-2. 添加配置文件支持
-3. 完善错误处理和用户体验
+## 🔧 API 接口
 
-## 🛠️ 技术栈
+| 端点 | 方法 | 描述 |
+|------|------|------|
+| `/health` | GET | 健康检查 |
+| `/api/rules` | GET | 列出所有规则 |
+| `/api/connections/test` | POST | 测试数据库连接 |
+| `/api/connections` | GET/POST | 管理数据库连接 |
+| `/api/schema/:id` | GET | 获取数据库 schema |
+| `/api/sql/review` | POST | 执行 SQL 审查 |
 
-- **语言**: Go 1.24+
-- **SQL解析**: ANTLR4 Go Runtime
-- **配置管理**: YAML
-- **测试框架**: Go标准测试库
-- **构建工具**: Make
+### 请求示例
 
-## 📖 使用指南
+**测试数据库连接**:
+```json
+POST /api/connections/test
+{
+  "host": "localhost",
+  "port": 3306,
+  "database": "test",
+  "username": "root",
+  "password": "password",
+  "engine": "mysql"
+}
+```
 
-（待实现后补充）
+**SQL 审查**:
+```json
+POST /api/sql/review
+{
+  "sql": "CREATE TABLE users (id INT, name VARCHAR(50))",
+  "connection_id": "demo",
+  "rules": ["mysql.table.require-pk"]
+}
+```
 
-## 🤝 学习成果
+## 📋 已实现的规则
 
-通过这个项目，预期达成的学习目标：
+- ✅ **表主键检查** (`mysql.table.require-pk`): 确保每个表都有主键
+- 🔄 **命名规范检查** (规划中): 表名和列名命名约定
+- 🔄 **语句安全检查** (规划中): 危险 SQL 操作检查
+- 🔄 **性能优化建议** (规划中): SELECT 语句优化建议
 
-1. **深度理解企业级规则引擎设计**
-2. **掌握 ANTLR 在实际项目中的应用**
-3. **学会插件化架构的具体实现**
-4. **提升 Go 语言高级编程技巧**
-5. **获得可重用的代码架构模板**
+## 🛠️ 开发指南
 
-## 📝 学习笔记
+### 添加新规则
 
-详细的学习过程和心得将记录在 `docs/learning-notes.md` 中。
+1. 在 `pkg/rules/mysql/` 创建新规则文件
+2. 实现 `Rule` 接口
+3. 在 `cmd/server/main.go` 中注册规则
+
+示例：
+```go
+type MyRule struct {
+    *advisor.BaseRule
+}
+
+func (r *MyRule) Check(ctx context.Context, checkCtx *advisor.Context) ([]*advisor.Advice, error) {
+    // 实现规则逻辑
+    return advices, nil
+}
+```
+
+### 运行测试
+
+```bash
+# 运行所有测试
+make test
+
+# 详细测试输出
+make test-verbose
+
+# 测试特定规则
+./bin/sql-review-server &
+curl -X POST http://localhost:8080/api/sql/review -d @examples/bad_examples.sql
+```
+
+### 代码格式化
+
+```bash
+# 格式化代码
+make fmt
+
+# 代码检查
+make vet
+
+# 运行 linter
+make lint
+```
+
+## 📚 学习资源
+
+- **架构分析**: `docs/bytebase-sql-review-analysis.md` - Bytebase 架构深度分析
+- **项目计划**: `docs/project-plan.md` - 详细的实施计划
+- **学习笔记**: `docs/learning-notes.md` - 开发过程中的学习心得
+- **参考文档**: `REFERENCES.md` - 相关技术文档链接
+
+## 🎓 学习价值
+
+### 技术收获
+- 🏗️ **企业级架构设计**: 插件化、可扩展的系统架构
+- 🔧 **Go 高级编程**: 接口设计、依赖注入、配置管理
+- 🌐 **API 服务开发**: RESTful API 设计和实现
+- 🗄️ **数据库交互**: 连接池管理、Schema 分析
+
+### 设计模式
+- **Strategy Pattern**: 规则策略模式
+- **Plugin Architecture**: 插件化架构
+- **Dependency Injection**: 依赖注入
+- **Configuration Management**: 配置管理模式
+
+## 🤝 贡献指南
+
+1. Fork 本项目
+2. 创建特性分支 (`git checkout -b feature/awesome-rule`)
+3. 提交更改 (`git commit -am 'Add awesome rule'`)
+4. 推送到分支 (`git push origin feature/awesome-rule`)
+5. 创建 Pull Request
+
+## 📄 许可证
+
+本项目基于 MIT 许可证开源 - 查看 [LICENSE](LICENSE) 文件了解详情
+
+## 🙏 致谢
+
+- **Bytebase 团队**: 提供了优秀的开源 SQL 审查系统作为学习参考
+- **Go 社区**: 提供了丰富的开源库和工具
 
 ---
 
-**项目创建时间**: 2025-09-16
-**基于版本**: Bytebase v3.5.2
-**学习重点**: SQL审查引擎架构设计与实现
+**项目创建**: 2025-09-17
+**基于**: Bytebase v3.5.2 架构
+**学习重点**: SQL 审查引擎设计与实现
+
+🌟 **如果这个项目对你有帮助，请给个 Star！**

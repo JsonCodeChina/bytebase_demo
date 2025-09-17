@@ -52,3 +52,6 @@ config/dev.yaml
 # Build artifacts
 coverage.out
 coverage.html
+
+# Git bundle files
+*.bundle
