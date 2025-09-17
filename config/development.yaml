@@ -1,0 +1,16 @@
+# SQL Review Learning Demo - 开发环境配置
+
+# 开发环境特定配置
+server:
+  mode: "debug"
+
+# 开发环境日志更详细
+logging:
+  level: "debug"
+  format: "text"
+
+# 开发环境数据库连接池较小
+database:
+  pool:
+    max_open_conns: 5
+    max_idle_conns: 2

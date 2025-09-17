@@ -1,0 +1,44 @@
+# SQL Review Learning Demo - 规则配置文件
+
+rules:
+  mysql:
+    # 表必须有主键
+    table_require_pk:
+      enabled: true
+      level: "ERROR"
+      options: {}
+
+    # 命名规范检查
+    naming_convention:
+      enabled: true
+      level: "WARNING"
+      options:
+        table_pattern: "^[a-z][a-z0-9_]*$"
+        column_pattern: "^[a-z][a-z0-9_]*$"
+        index_pattern: "^idx_[a-z0-9_]+$"
+
+    # 语句安全检查
+    statement_safety:
+      enabled: true
+      level: "ERROR"
+      options:
+        forbid_drop_database: true
+        forbid_truncate: true
+        require_where_for_update: true
+        require_where_for_delete: true
+
+    # 列类型检查
+    column_type_check:
+      enabled: false
+      level: "WARNING"
+      options:
+        forbidden_types: ["text", "blob", "longtext", "longblob"]
+        max_varchar_length: 255
+
+    # SELECT性能检查
+    select_performance:
+      enabled: true
+      level: "WARNING"
+      options:
+        forbid_select_star: true
+        max_limit: 1000

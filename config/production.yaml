@@ -1,0 +1,20 @@
+# SQL Review Learning Demo - 生产环境配置
+
+# 生产环境配置
+server:
+  mode: "release"
+  cors:
+    # 生产环境应该限制CORS来源
+    allow_origins: ["https://yourdomain.com"]
+
+# 生产环境日志
+logging:
+  level: "info"
+  format: "json"
+
+# 生产环境数据库连接池较大
+database:
+  pool:
+    max_open_conns: 20
+    max_idle_conns: 10
+    conn_max_lifetime: "2h"
