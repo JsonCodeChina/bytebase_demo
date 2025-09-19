@@ -36,8 +36,8 @@ func (r *TableRequirePKRule) Check(ctx context.Context, checkCtx *advisor.Contex
 	// 解析SQL语句，查找CREATE TABLE语句
 	sql := strings.ToUpper(strings.TrimSpace(checkCtx.SQL))
 
-	// 简单的正则表达式匹配CREATE TABLE语句
-	createTableRegex := regexp.MustCompile(`CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:` + "`" + `)?(\w+)(?:` + "`" + `)?\s*\((.*?)\)`)
+	// 简单的正则表达式匹配CREATE TABLE语句，使用(?s)标志允许.匹配换行符
+	createTableRegex := regexp.MustCompile(`(?s)CREATE\s+TABLE\s+(?:IF\s+NOT\s+EXISTS\s+)?(?:` + "`" + `)?(\w+)(?:` + "`" + `)?\s*\((.*?)\)`)
 	matches := createTableRegex.FindAllStringSubmatch(sql, -1)
 
 	for _, match := range matches {
