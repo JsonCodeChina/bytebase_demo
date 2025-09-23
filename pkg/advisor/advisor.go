@@ -1,11 +1,27 @@
+// Package advisor defines the interface for analyzing SQL statements.
+// This is a simplified but functional implementation inspired by Bytebase.
 package advisor
 
 import (
 	"context"
 	"database/sql"
+	"fmt"
+	"sync"
+
+	"github.com/pkg/errors"
 )
 
-// Level 建议级别
+// Engine represents the database engine type.
+type Engine string
+
+const (
+	// MySQL represents MySQL database engine.
+	MySQL Engine = "MYSQL"
+	// PostgreSQL represents PostgreSQL database engine.
+	PostgreSQL Engine = "POSTGRESQL"
+)
+
+// Level represents the severity level of a rule.
 type Level string
 
 const (
@@ -14,23 +30,42 @@ const (
 	LevelInfo    Level = "INFO"
 )
 
-// Advice 审查建议
+// Status represents the status of advice (maps to Level for compatibility).
+type Status = Level
+
+// Position represents a position in the SQL text.
+type Position struct {
+	Line   int `json:"line"`
+	Column int `json:"column"`
+}
+
+// Advice represents a piece of advice from SQL review.
 type Advice struct {
+	Status        Status    `json:"status"`
+	Code          int32     `json:"code"`
+	Title         string    `json:"title"`
+	Content       string    `json:"content"`
+	StartPosition *Position `json:"startPosition,omitempty"`
+	// Legacy fields for compatibility
 	Level   Level  `json:"level"`
-	Title   string `json:"title"`
 	Message string `json:"message"`
 	Line    int    `json:"line,omitempty"`
 	Column  int    `json:"column,omitempty"`
 	RuleID  string `json:"rule_id"`
 }
 
-// Context 审查上下文
+// Context encapsulates the checking context and configuration.
 type Context struct {
-	SQL          string           `json:"sql"`
-	Engine       string           `json:"engine"`
-	DatabaseName string           `json:"database_name"`
-	Rules        []string         `json:"rules"`        // 启用的规则ID列表
-	Connection   *sql.DB          `json:"-"`            // 数据库连接
+	// Core fields
+	SQL    string  `json:"sql"`
+	Engine Engine  `json:"engine"`
+	Rule   *Rule   `json:"rule"`
+	AST    any     `json:"-"` // Parsed abstract syntax tree
+
+	// Legacy compatibility fields
+	DatabaseName string            `json:"database_name"`
+	Rules        []string          `json:"rules"`        // 启用的规则ID列表
+	Connection   *sql.DB           `json:"-"`            // 数据库连接
 	Metadata     *DatabaseMetadata `json:"metadata"`     // 数据库元数据
 }
 
@@ -62,9 +97,10 @@ type IndexMetadata struct {
 	Columns []string `json:"columns"`
 }
 
-// Advisor SQL审查器接口
+// Advisor is the interface for SQL statement analysis.
+// Each rule should implement this interface.
 type Advisor interface {
-	Check(ctx context.Context, checkCtx *Context) ([]*Advice, error)
+	Check(ctx context.Context, checkCtx Context) ([]*Advice, error)
 }
 
 // Rule 规则接口
@@ -161,4 +197,96 @@ func (a *DefaultAdvisor) Check(ctx context.Context, checkCtx *Context) ([]*Advic
 	}
 
 	return allAdvices, nil
+}
+
+// Type represents the type identifier for an advisor.
+type Type string
+
+// Rule represents a SQL review rule configuration.
+type Rule struct {
+	Type    Type   `yaml:"type"`
+	Level   Level  `yaml:"level"`
+	Engine  Engine `yaml:"engine"`
+	Payload any    `yaml:"payload,omitempty"`
+}
+
+// Global registry for advisors (Bytebase-style).
+var (
+	advisorMu sync.RWMutex
+	advisors  = make(map[Engine]map[Type]Advisor)
+)
+
+// Register makes an advisor available by the provided engine and type.
+// If Register is called twice with the same combination or if advisor is nil,
+// it panics.
+func Register(engine Engine, advType Type, advisor Advisor) {
+	advisorMu.Lock()
+	defer advisorMu.Unlock()
+
+	if advisor == nil {
+		panic("advisor: Register advisor is nil")
+	}
+
+	engineAdvisors, ok := advisors[engine]
+	if !ok {
+		advisors[engine] = map[Type]Advisor{
+			advType: advisor,
+		}
+	} else {
+		if _, dup := engineAdvisors[advType]; dup {
+			panic(fmt.Sprintf("advisor: Register called twice for advisor %v for %v", advType, engine))
+		}
+		engineAdvisors[advType] = advisor
+	}
+}
+
+// CheckByType runs the specified advisor and returns the advice list.
+func CheckByType(ctx context.Context, engine Engine, advType Type, checkCtx Context) (adviceList []*Advice, err error) {
+	// Panic recovery for safer execution
+	defer func() {
+		if panicErr := recover(); panicErr != nil {
+			if panicError, ok := panicErr.(error); ok {
+				err = errors.Errorf("advisor check PANIC RECOVER, type: %v, err: %v", advType, panicError)
+			} else {
+				err = errors.Errorf("advisor check PANIC RECOVER, type: %v, err: %v", advType, panicErr)
+			}
+		}
+	}()
+
+	advisorMu.RLock()
+	engineAdvisors, ok := advisors[engine]
+	defer advisorMu.RUnlock()
+
+	if !ok {
+		return nil, errors.Errorf("advisor: unknown engine type %v", engine)
+	}
+
+	advisor, ok := engineAdvisors[advType]
+	if !ok {
+		return nil, errors.Errorf("advisor: unknown advisor %v for %v", advType, engine)
+	}
+
+	return advisor.Check(ctx, checkCtx)
+}
+
+// GetRegisteredAdvisors returns all registered advisor types for a given engine.
+func GetRegisteredAdvisors(engine Engine) []Type {
+	advisorMu.RLock()
+	defer advisorMu.RUnlock()
+
+	engineAdvisors, ok := advisors[engine]
+	if !ok {
+		return nil
+	}
+
+	var types []Type
+	for advType := range engineAdvisors {
+		types = append(types, advType)
+	}
+	return types
+}
+
+// NewStatusByRuleLevel converts rule level to advice status.
+func NewStatusByRuleLevel(level Level) Status {
+	return Status(level)
 }
